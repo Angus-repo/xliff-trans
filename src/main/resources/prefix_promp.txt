@@ -1,0 +1,1 @@
+Please translate into Traditional Chinese used in Taiwan, using an easily understandable translation, and maintain the original XML structure and all symbols. Add a line break after each </source> tag.

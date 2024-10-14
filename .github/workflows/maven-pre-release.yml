@@ -1,0 +1,114 @@
+name: pre-release
+
+on:
+  release:
+    types: [created]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up JDK 21
+      id: setup-java
+      uses: actions/setup-java@v4
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+
+    - name: Print java.home on Linux and macOS
+      run: |
+        echo "JAVA_HOME: ${{ steps.setup-java.outputs.java-home }}"
+      if: matrix.os != 'windows-latest'
+
+    - name: Get project version on Linux and macOS
+      run: |
+        VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+        echo "VERSION=$VERSION" >> $GITHUB_ENV
+      if: matrix.os != 'windows-latest'
+
+    - name: Get project version on Windows
+      run: |
+        $version = 0.1.1 #& mvn help:evaluate -Dexpression=project.version -q -DforceStdout
+        Write-Host "Maven project version: $version"
+        echo "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
+      if: matrix.os == 'windows-latest'
+      shell: pwsh
+      
+    - name: Build with Maven
+      run: mvn -B package -P"${{ matrix.os }},withJRE" --file pom.xml
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: artifacts-${{ matrix.os }}
+        path: ./target/xliff-trans-*
+
+  release:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: checkout_project
+          
+      - name: Get project version
+        run: |
+          VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+        working-directory: checkout_project
+  
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: ./artifacts/
+
+      - name: ls artifacts-ubuntu
+        run: ls -l artifacts/artifacts-ubuntu-latest
+
+      - name: ls artifacts-macos
+        run: ls -l artifacts/artifacts-macos-latest
+  
+      - name: Get project version on Linux and macOS
+        run: |
+          VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+        working-directory: checkout_project
+  
+      - name: Create Pre-release
+        id: create_release
+        uses: actions/create-release@v1
+        with:
+          tag_name: "v${{ env.VERSION }}"
+          release_name: "v${{ env.VERSION }} Pre-release"
+          body: "This is a pre-release for version v${{ env.VERSION }}"
+          draft: false
+          prerelease: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  
+      - name: Upload Release Assets
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: "v${{ env.VERSION }}"
+          files: |
+            ./artifacts/artifacts-ubuntu-latest/xliff-trans-${{ env.VERSION }}.tar.gz
+            ./artifacts/artifacts-ubuntu-latest/xliff-trans-${{ env.VERSION }}.zip
+            ./artifacts/artifacts-ubuntu-latest/xliff-trans-${{ env.VERSION }}-ubuntu-withJRE.tar.gz
+            ./artifacts/artifacts-macos-latest/xliff-trans-${{ env.VERSION }}-macos.tar.gz
+            ./artifacts/artifacts-macos-latest/xliff-trans-${{ env.VERSION }}-macos-withJRE.tar.gz
+            ./artifacts/artifacts-macos-latest/xliff-trans-${{ env.VERSION }}-windows-withJRE.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
