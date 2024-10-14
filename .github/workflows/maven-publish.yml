@@ -1,0 +1,67 @@
+name: pre-release
+
+on:
+  release:
+    types: [created]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+    - uses: actions/checkout@v4
+  
+    - name: Set up JDK 21
+      uses: actions/setup-java@v4
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+
+    # 提取 Maven 版本號
+    - name: Get project version
+      id: get_version
+      run: |
+        VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+        echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+    - name: Build with Maven
+      run: mvn -B package -PwithJre --file pom.xml
+
+    # 自動創建 Pre-release
+    - name: Create Pre-release
+      id: create_release
+      uses: actions/create-release@v1
+      with:
+        tag_name: "v${{ env.VERSION }}" # 使用從 Maven 中提取的版本號
+        release_name: "v${{ env.VERSION }} Pre-release"
+        body: "This is a pre-release for version v${{ env.VERSION }}"
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: 印出java版本
+      run: javac -version
+
+    - name: 印出javahome
+      run: echo $JAVA_HOME
+      
+    # 上傳資產，並指定 tag_name
+    - name: Upload Release Assets
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: "v${{ env.VERSION }}" # 指定與創建的 Release 相同的 tag_name
+        files: |
+          ./target/xliff-trans-${{ env.VERSION }}-withJRE.tar.gz
+          ./target/xliff-trans-${{ env.VERSION }}-withJRE.zip
+          ./target/xliff-trans-${{ env.VERSION }}.tar.gz
+          ./target/xliff-trans-${{ env.VERSION }}.zip
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

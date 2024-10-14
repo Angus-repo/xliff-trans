@@ -1,0 +1,1 @@
+java -cp . -jar xliff-trans-*.jar
