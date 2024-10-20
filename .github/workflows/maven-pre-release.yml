@@ -81,7 +81,7 @@ jobs:
       - name: ls artifacts-macos
         run: ls -l artifacts/artifacts-macos-latest
 
-      - name: ls artifacts-macos
+      - name: ls artifacts-windows
         run: ls -l artifacts/artifacts-windows-latest
   
       - name: Get project version on Linux and macOS
@@ -112,6 +112,6 @@ jobs:
             ./artifacts/artifacts-ubuntu-latest/xliff-trans-${{ env.VERSION }}-ubuntu-withJRE.tar.gz
             ./artifacts/artifacts-macos-latest/xliff-trans-${{ env.VERSION }}-macos.tar.gz
             ./artifacts/artifacts-macos-latest/xliff-trans-${{ env.VERSION }}-macos-withJRE.tar.gz
-            ./artifacts/artifacts-macos-latest/xliff-trans-${{ env.VERSION }}-windows-withJRE.zip
+            ./artifacts/artifacts-windows-latest/xliff-trans-${{ env.VERSION }}-windows-withJRE.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
