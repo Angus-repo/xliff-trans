@@ -64,6 +64,10 @@ jobs:
         name: artifacts-${{ matrix.os }}
         path: ./target/xliff-trans-*
 
+    - name: var-windows
+      run: var
+      if: matrix.os == 'windows-latest'
+
   release:
     runs-on: ubuntu-latest
     needs: build
