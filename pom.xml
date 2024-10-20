@@ -271,32 +271,67 @@
 			<id>windows-latest</id>
 			<build>
 				<plugins>
+<!--					<plugin>-->
+<!--						<groupId>org.apache.maven.plugins</groupId>-->
+<!--						<artifactId>maven-assembly-plugin</artifactId>-->
+<!--						<version>3.3.0</version>-->
+<!--						<configuration>-->
+<!--							<appendAssemblyId>false</appendAssemblyId>-->
+<!--						</configuration>-->
+<!--						<executions>-->
+<!--							<execution>-->
+<!--								<id>make-assembly-tar-gz-windows-withJRE</id>-->
+<!--								<phase>package</phase>-->
+<!--								<goals>-->
+<!--									<goal>single</goal>-->
+<!--								</goals>-->
+<!--								<configuration>-->
+<!--									<formats>-->
+<!--										<format>zip</format>-->
+<!--									</formats>-->
+<!--									<descriptors>-->
+<!--										<descriptor>src/assembly/zip_withJRE.xml</descriptor>-->
+<!--									</descriptors>-->
+<!--									<finalName>${project.artifactId}-${project.version}-windows-withJRE</finalName>-->
+<!--								</configuration>-->
+<!--							</execution>-->
+<!--						</executions>-->
+<!--					</plugin>-->
 					<plugin>
-						<groupId>org.apache.maven.plugins</groupId>
-						<artifactId>maven-assembly-plugin</artifactId>
-						<version>3.3.0</version>
-						<configuration>
-							<appendAssemblyId>false</appendAssemblyId>
-						</configuration>
-						<executions>
-							<execution>
-								<id>make-assembly-tar-gz-windows-withJRE</id>
-								<phase>package</phase>
-								<goals>
-									<goal>single</goal>
-								</goals>
-								<configuration>
-									<formats>
-										<format>zip</format>
-									</formats>
-									<descriptors>
-										<descriptor>src/assembly/zip_withJRE.xml</descriptor>
-									</descriptors>
-									<finalName>${project.artifactId}-${project.version}-windows-withJRE</finalName>
-								</configuration>
-							</execution>
-						</executions>
-					</plugin>
+			          <groupId>org.codehaus.mojo</groupId>
+			          <artifactId>exec-maven-plugin</artifactId>
+			          <version>3.0.0</version>
+			          <executions>
+			            <execution>
+			              <id>package-jre</id>
+			              <phase>package</phase>
+			              <goals>
+			                <goal>exec</goal>
+			              </goals>
+			              <configuration>
+			                <executable>${java.home}/bin/jpackage</executable>
+			                <arguments>
+			                  <argument>--type</argument>
+			                  <argument>exe</argument> <!-- For Windows -->
+			                  <argument>--input</argument>
+			                  <argument>${project.build.directory}</argument>
+			                  <argument>--dest</argument>
+			                  <argument>${project.build.directory}/installer</argument>
+			                  <argument>--name</argument>
+			                  <argument>${project.artifactId}</argument>
+			                  <argument>--main-jar</argument>
+			                  <argument>${project.build.finalName}.jar</argument>
+			                  <argument>--main-class</argument>
+			                  <argument>com.angus.xliff.swing.XliffSwingUI</argument>
+			                  <argument>--app-version</argument>
+			                  <argument>${project.version}</argument>
+			                  <argument>--java-options</argument>
+			                  <argument>-Xmx512m</argument>
+			                </arguments>
+			              </configuration>
+			            </execution>
+			          </executions>
+			        </plugin>
 				</plugins>
 			</build>
 		</profile>
