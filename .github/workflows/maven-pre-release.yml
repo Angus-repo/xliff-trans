@@ -80,6 +80,9 @@ jobs:
 
       - name: ls artifacts-macos
         run: ls -l artifacts/artifacts-macos-latest
+
+      - name: ls artifacts-macos
+        run: ls -l artifacts/artifacts-windows-latest
   
       - name: Get project version on Linux and macOS
         run: |
