@@ -90,8 +90,7 @@ public class ChatGPTClient {
 
             String jsonBody = "{" +
                     "\"model\": \"" + MODEL_VERSION + "\"," +
-                    "\"messages\": [{\"role\": \"user\", \"content\": \"" + escapeJson(combinedContent) + "\"}]," +
-                    "\"max_tokens\": 4096" +
+                    "\"messages\": [{\"role\": \"user\", \"content\": \"" + escapeJson(combinedContent) + "\"}]" +
                     "}";
 
             StringEntity entity = new StringEntity(jsonBody, StandardCharsets.UTF_8);
@@ -113,6 +112,7 @@ public class ChatGPTClient {
                     targetWriter.write(responseContent);
                     targetWriter.write(System.lineSeparator());
                 } else {
+                    logger.error("ChatGPT API Response: {}", jsonResponse.toString());
                     throw new IOException("Invalid response from ChatGPT API.");
                 }
 
