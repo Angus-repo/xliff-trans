@@ -227,10 +227,11 @@ public class XliffSwingUI extends JFrame {
                         return null;
                     }
 
-                    int completedLines = 0;
+                    int completedLines = ChatGPTClient.getCompletedCount();
+                    if (completedLines > 0) publish(getMessage("step_2_resumed") + completedLines + "/" + totalLines);
                     while (completedLines < totalLines) {
                         try {
-                            int processed = ChatGPTClient.processNextBatch(filePath);
+                            int processed = ChatGPTClient.processNextBatch(filePath, message -> publish(message));
                             completedLines += processed;
                             publish(completedLines + "/" + totalLines + getMessage("step_2_completed"));
                         } catch (Exception ex) {
