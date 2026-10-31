@@ -12,7 +12,6 @@ import java.util.Map;
 import java.util.ResourceBundle;
 
 import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.transform.OutputKeys;
 import javax.xml.transform.Transformer;
@@ -43,18 +42,16 @@ public class UpdateXliffTarget {
             return;
         }
 
+        updatedCount = 0;
         Map<String, String> sourceMap = new HashMap<>();
-        Files.lines(Paths.get(args[0] + TARGET_FILE_NAME_POSTFIX)).forEach(line -> {
-            if (line.contains("<source") && line.contains("</source>")) {
-                String id = extractAttribute(line, "id");
-                String content = extractContent(line, "source");
-                sourceMap.put(id, content.trim());
-            }
-        });
+        String translated = new String(Files.readAllBytes(Paths.get(args[0] + TARGET_FILE_NAME_POSTFIX)),
+                java.nio.charset.StandardCharsets.UTF_8);
+        for (Map.Entry<String, String> entry : TranslationProgress.parseRecords(translated).entrySet()) {
+            sourceMap.put(entry.getKey(), TranslationProgress.content(entry.getValue()).trim());
+        }
 
         File inputFile = new File(args[0]);
-        DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
-        DocumentBuilder dBuilder = dbFactory.newDocumentBuilder();
+        DocumentBuilder dBuilder = XliffXml.newDocumentBuilder();
         Document doc = dBuilder.parse(inputFile);
         doc.getDocumentElement().normalize();
 
@@ -99,18 +96,6 @@ public class UpdateXliffTarget {
 
     public static String getUpdatedFilePath() {
         return updatedFilePath;
-    }
-
-    private static String extractAttribute(String line, String attributeName) {
-        int attrStart = line.indexOf(attributeName + "=\"") + (attributeName + "=\"").length();
-        int attrEnd = line.indexOf("\"", attrStart);
-        return line.substring(attrStart, attrEnd);
-    }
-
-    private static String extractContent(String line, String tagName) {
-        int start = line.indexOf(">") + 1;
-        int end = line.indexOf("</" + tagName + ">");
-        return line.substring(start, end);
     }
 
     private static String recoverNewline(String input) {

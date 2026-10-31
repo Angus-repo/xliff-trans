@@ -218,41 +218,25 @@ public class XliffSwingUI extends JFrame {
                     int totalLines;
                     try {
                         totalLines = ChatGPTClient.getTotalLines(filePath);
+                        publish(getMessage("config_loaded") + ChatGPTClient.getConfigurationPath());
                         publish(getMessage("step_2_sending_request"));
                     } catch (Exception ex) {
                         publish(getMessage("error_occurred") + ex.getMessage());
-                        logger.error("Step 2 initial error: " + ex.getMessage(), ex);
+                        logger.error("Step 2 initial error: {}", ex.getMessage());
+                        publish(getMessage("step_2_failed"));
                         return null;
                     }
 
-                    int completedLines = 0;
+                    int completedLines = ChatGPTClient.getCompletedCount();
+                    if (completedLines > 0) publish(getMessage("step_2_resumed") + completedLines + "/" + totalLines);
                     while (completedLines < totalLines) {
                         try {
-                            int processed = ChatGPTClient.processNextBatch(filePath);
+                            int processed = ChatGPTClient.processNextBatch(filePath, message -> publish(message));
                             completedLines += processed;
                             publish(completedLines + "/" + totalLines + getMessage("step_2_completed"));
-                        } catch (NullPointerException npe) {
-                            publish(getMessage("error_null_response"));
-                            logger.error("Null response in Step 2:" + npe.getMessage(), npe);
-                            break;
-                        } catch (IllegalArgumentException iae) {
-                            publish(getMessage("error_invalid_key"));
-                            logger.error("Invalid key in Step 2:" + iae.getMessage(), iae);
-                            break;
                         } catch (Exception ex) {
-                            String message = ex.getMessage();
-                            if (message.contains("rate limit")) {
-                                publish(getMessage("error_rate_limit"));
-                            } else if (message.contains("network")) {
-                                publish(getMessage("error_network"));
-                            } else if (message.contains("timeout")) {
-                                publish(getMessage("error_timeout"));
-                            } else if (message.contains("invalid_request_error")) {
-                                publish(getMessage("error_invalid_key"));
-                            } else {
-                                publish(getMessage("error_occurred") + message);
-                            }
-                            logger.error("Step 2 processing error:" + ex.getMessage(), ex);
+                            publish(getMessage("error_occurred") + ex.getMessage());
+                            logger.error("Step 2 processing failed: {}", ex.getMessage());
                             break;
                         }
                     }
