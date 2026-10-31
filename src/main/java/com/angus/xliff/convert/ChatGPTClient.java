@@ -141,7 +141,7 @@ public class ChatGPTClient {
         		throw new IOException("prefix_promp.txt not found at: " + file.getAbsolutePath());
         	}
         }
-        return Files.readString(file.toPath(), StandardCharsets.UTF_8);
+        return new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8);
     }
 
     private static String escapeJson(String text) {
