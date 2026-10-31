@@ -1,154 +1,111 @@
-// File: ChatGPTClient.java
-
 package com.angus.xliff.convert;
 
 import static com.angus.xliff.convert.Constans.*;
 
 import java.io.BufferedReader;
-import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.List;
-import java.util.stream.Collectors;
 import java.util.ResourceBundle;
+import java.util.stream.Collectors;
 
 import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.core5.http.io.entity.StringEntity;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import com.angus.xliff.swing.XliffSwingUI;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 public class ChatGPTClient {
-
-	private static final Logger logger = LoggerFactory.getLogger(ChatGPTClient.class);
-	
-    private static String API_KEY;
-    private static String MODEL_VERSION;
     private static final String API_URL = "https://api.openai.com/v1/chat/completions";
-
     private static int totalLines = 0;
-    private static ResourceBundle config = ResourceBundle.getBundle("Config");
-
-    // Path to prefix_promp.txt
-    private static final String PREFIX_PROMP_PATH = "prefix_promp.txt"; // Update this path as needed
-
-    static {
-        API_KEY = config.containsKey("api_key") ? config.getString("api_key") : "YOUR_API_KEY";
-        MODEL_VERSION = config.containsKey("model_version") ? config.getString("model_version") : "gpt-4o-mini";
-    }
+    private static TranslationConfig config;
 
     public static int getTotalLines(String filePath) throws IOException {
+        // Reload on every Step 2 invocation, so editing the file takes effect on retry.
+        config = null;
+        totalLines = 0;
+        config = TranslationConfig.load();
         List<String> lines = Files.readAllLines(Paths.get(filePath + SOURCE_FILE_NAME_POSTFIX));
         totalLines = lines.size();
         return totalLines;
     }
 
+    public static String getConfigurationPath() {
+        return config == null ? "" : config.getPath().toString();
+    }
+
     @SuppressWarnings("deprecation")
-	public static int processNextBatch(String filePath) throws Exception {
-        if (API_KEY == null || API_KEY.isEmpty() || "YOUR_API_KEY".equals(API_KEY)) {
-            throw new IllegalArgumentException("Invalid API key provided. Please check your configuration.");
-        }
+    public static int processNextBatch(String filePath) throws Exception {
+        if (config == null) throw new IOException("Start Step 2 before processing a batch.");
+        int startLine = Math.max(totalLines - config.getBatchSize(), 0);
+        if (totalLines <= 0) return 0;
 
-        // Read batch_size from Config.properties, default to 50
-        int batchSize = 50; // Default value
-        if (config.containsKey("batch_size")) {
-            try {
-                batchSize = Integer.parseInt(config.getString("batch_size"));
-            } catch (NumberFormatException e) {
-                logger.error("Invalid batch_size in Config.properties. Using default value 50.");
-            }
-        }
+        List<String> lines = Files.readAllLines(Paths.get(filePath + SOURCE_FILE_NAME_POSTFIX))
+                .subList(startLine, totalLines);
+        String content = lines.stream().collect(Collectors.joining("\n"));
+        String combinedContent = config.readPrefix() + content;
 
-        int startLine = totalLines - batchSize;
-        startLine = Math.max(startLine, 0);
+        ObjectMapper mapper = new ObjectMapper();
+        ObjectNode body = mapper.createObjectNode();
+        body.put("model", config.getModel());
+        body.putArray("messages").addObject().put("role", "user").put("content", combinedContent);
 
         try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
             HttpPost postRequest = new HttpPost(API_URL);
             postRequest.setHeader("Content-Type", "application/json");
-            postRequest.setHeader("Authorization", "Bearer " + API_KEY);
+            postRequest.setHeader("Authorization", "Bearer " + config.getApiKey());
+            postRequest.setEntity(new StringEntity(mapper.writeValueAsString(body), StandardCharsets.UTF_8));
 
-            List<String> lines = Files.readAllLines(Paths.get(filePath + SOURCE_FILE_NAME_POSTFIX))
-                                      .subList(startLine, totalLines);
-            String content = lines.stream().collect(Collectors.joining("\n"));
-
-            // Read prefix_promp.txt
-            String prefixPromp = readPrefixPromp(PREFIX_PROMP_PATH);
-
-            // Concatenate prefixPromp with content
-            String combinedContent = prefixPromp + content;
-
-            String jsonBody = "{" +
-                    "\"model\": \"" + MODEL_VERSION + "\"," +
-                    "\"messages\": [{\"role\": \"user\", \"content\": \"" + escapeJson(combinedContent) + "\"}]" +
-                    "}";
-
-            StringEntity entity = new StringEntity(jsonBody, StandardCharsets.UTF_8);
-            postRequest.setEntity(entity);
-
-            try (CloseableHttpResponse response = httpClient.execute(postRequest);
-                 FileWriter targetWriter = new FileWriter(filePath + TARGET_FILE_NAME_POSTFIX, true)) {
-                BufferedReader reader = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
+            try (CloseableHttpResponse response = httpClient.execute(postRequest)) {
                 StringBuilder result = new StringBuilder();
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    result.append(line);
+                if (response.getEntity() != null) {
+                    try (BufferedReader reader = new BufferedReader(new InputStreamReader(
+                            response.getEntity().getContent(), StandardCharsets.UTF_8))) {
+                        String line;
+                        while ((line = reader.readLine()) != null) result.append(line);
+                    }
                 }
-
-                ObjectMapper mapper = new ObjectMapper();
-                JsonNode jsonResponse = mapper.readTree(result.toString());
-                if (jsonResponse.has("choices") && jsonResponse.get("choices").size() > 0) {
-                    String responseContent = jsonResponse.get("choices").get(0).get("message").get("content").asText();
+                String responseContent = readResponse(response.getCode(), result.toString());
+                // Do not create/append output or advance progress when the request fails.
+                try (FileWriter targetWriter = new FileWriter(filePath + TARGET_FILE_NAME_POSTFIX, true)) {
                     targetWriter.write(responseContent);
                     targetWriter.write(System.lineSeparator());
-                } else {
-                    logger.error("ChatGPT API Response: {}", jsonResponse.toString());
-                    throw new IOException("Invalid response from ChatGPT API.");
                 }
-
-                totalLines -= batchSize;
-                return Math.min(batchSize, lines.size());
+                totalLines -= lines.size();
+                return lines.size();
             }
         }
     }
 
-    /**
-     * Reads the content of prefix_promp.txt from the specified path.
-     *
-     * @param filePath Path to prefix_promp.txt
-     * @return Content of prefix_promp.txt as a String
-     * @throws IOException If the file cannot be read
-     */
-    private static String readPrefixPromp(String filePath) throws IOException {
-    	
-    	URL resource = ChatGPTClient.class.getClassLoader().getResource(filePath);
-        String fullFilePath = resource.getFile();
-        File file = new File(fullFilePath);
-        if (!file.exists()) {
-        	
-        	file = new File(filePath);
-        	if (!file.exists()) {
-        		throw new IOException("prefix_promp.txt not found at: " + file.getAbsolutePath());
-        	}
+    static String readResponse(int status, String body) throws IOException {
+        ResourceBundle messages = ResourceBundle.getBundle("MessagesBundle");
+        if (status == 401) throw new IOException(messages.getString("error_invalid_key") + " (HTTP 401)");
+        if (status == 403) throw new IOException(messages.getString("error_api_forbidden") + " (HTTP 403)");
+        JsonNode json = null;
+        try {
+            json = new ObjectMapper().readTree(body);
+        } catch (IOException ignored) {
+            // Parser errors can include the response body; never expose them or API error.message.
         }
-        return new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8);
-    }
-
-    private static String escapeJson(String text) {
-        return text.replace("\\", "\\\\")
-                   .replace("\"", "\\\"")
-                   .replace("\n", "\\n")
-                   .replace("\r", "\\r")
-                   .replace("\t", "\\t");
+        if (status == 429) {
+            boolean quota = json != null && "insufficient_quota".equals(json.path("error").path("code").asText());
+            throw new IOException(messages.getString(quota ? "error_api_quota" : "error_rate_limit") + " (HTTP 429)");
+        }
+        if (status < 200 || status >= 300) {
+            throw new IOException(messages.getString("error_api_request") + " (HTTP " + status + ")");
+        }
+        JsonNode content = json == null ? null : json.path("choices").path(0).path("message").path("content");
+        if (content == null || !content.isTextual() || content.asText().trim().isEmpty()) {
+            throw new IOException(messages.getString("error_null_response"));
+        }
+        return content.asText();
     }
 }
