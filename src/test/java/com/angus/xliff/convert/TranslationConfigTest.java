@@ -135,21 +135,13 @@ public class TranslationConfigTest {
     }
 
     @Test public void packagedJarUsesItsOwnDirectoryEvenWhenLaunchedElsewhere() throws Exception {
-        Path app = temporary.newFolder("程式 with spaces").toPath();
+        Path app = temporary.newFolder("application with spaces").toPath();
         Path cwd = temporary.newFolder("other working directory").toPath();
         write(app, "api_key=test-beside-jar\n");
         write(cwd, "api_key=test-wrong-directory\n");
         Files.write(app.resolve("prefix_promp.txt"), "external-prompt".getBytes(StandardCharsets.UTF_8));
         Path jar = app.resolve("test app.jar");
-        Manifest manifest = new Manifest();
-        manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
-        manifest.getMainAttributes().put(Attributes.Name.MAIN_CLASS, PackagedProbe.class.getName());
-        try (JarOutputStream out = new JarOutputStream(Files.newOutputStream(jar), manifest)) {
-            copyResource(out, TranslationConfig.class.getName().replace('.', '/') + ".class");
-            copyResource(out, PackagedProbe.class.getName().replace('.', '/') + ".class");
-            copyResource(out, "MessagesBundle.properties");
-            copyResource(out, "Config.properties"); // Deliberately contains YOUR_API_KEY.
-        }
+        createProbeJar(jar);
         String java = Paths.get(System.getProperty("java.home"), "bin", "java").toString();
         Process process = new ProcessBuilder(java, "-jar", jar.toString()).directory(cwd.toFile())
                 .redirectErrorStream(true).start();
@@ -159,6 +151,33 @@ public class TranslationConfigTest {
         }
         assertEquals(output, 0, process.waitFor());
         assertTrue(output.contains("external configuration loaded"));
+    }
+
+    @Test public void packagedClassLoaderSupportsUnicodeApplicationDirectory() throws Exception {
+        // Test Unicode code-source URI decoding independently of the Windows Java
+        // launcher's native command-line code page, which can replace Chinese with '?'.
+        Path app = temporary.newFolder("程式 with spaces").toPath();
+        write(app, "api_key=test-beside-jar\n");
+        Files.write(app.resolve("prefix_promp.txt"), "external-prompt".getBytes(StandardCharsets.UTF_8));
+        Path jar = app.resolve("test app.jar");
+        createProbeJar(jar);
+        try (java.net.URLClassLoader loader = new java.net.URLClassLoader(
+                new java.net.URL[] {jar.toUri().toURL()}, null)) {
+            Class<?> probe = loader.loadClass(PackagedProbe.class.getName());
+            probe.getMethod("main", String[].class).invoke(null, (Object) new String[0]);
+        }
+    }
+
+    private static void createProbeJar(Path jar) throws IOException {
+        Manifest manifest = new Manifest();
+        manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
+        manifest.getMainAttributes().put(Attributes.Name.MAIN_CLASS, PackagedProbe.class.getName());
+        try (JarOutputStream out = new JarOutputStream(Files.newOutputStream(jar), manifest)) {
+            copyResource(out, TranslationConfig.class.getName().replace('.', '/') + ".class");
+            copyResource(out, PackagedProbe.class.getName().replace('.', '/') + ".class");
+            copyResource(out, "MessagesBundle.properties");
+            copyResource(out, "Config.properties"); // Deliberately contains YOUR_API_KEY.
+        }
     }
 
     public static class PackagedProbe {
