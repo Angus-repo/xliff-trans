@@ -3,7 +3,6 @@
 package com.angus.xliff.convert;
 
 import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
 import org.slf4j.Logger;
@@ -29,8 +28,7 @@ public class XmlSourceExtractor {
 
         try (FileWriter writer = new FileWriter(args[0] + SOURCE_FILE_NAME_POSTFIX)) {
             File inputFile = new File(args[0]);
-            DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
-            DocumentBuilder dBuilder = dbFactory.newDocumentBuilder();
+            DocumentBuilder dBuilder = XliffXml.newDocumentBuilder();
             Document doc = dBuilder.parse(inputFile);
             doc.getDocumentElement().normalize();
 

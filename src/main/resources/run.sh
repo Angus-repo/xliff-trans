@@ -1,3 +1,3 @@
 #!/bin/bash
-
-java -cp . -jar xliff-trans-0.1.1.jar
+cd -- "$(dirname -- "$0")" || exit 1
+exec java -cp . -jar xliff-trans-*.jar

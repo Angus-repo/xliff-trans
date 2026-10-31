@@ -10,6 +10,13 @@ Czech (cs)                  | [README_cs](https://github.com/Angus-repo/xliff-tr
 
 此工具是一個支援xliff(1.2)格式，透過外部 AI 服務（如 ChatGPT）來進行 XLIFF翻譯。
 
+### 0.1.3 修正
+
+- 修正 Java 24/25 解析大型 XLIFF 時的 `JAXP00010003`／`JAXP00010004` 錯誤。
+- 將 `maxGeneralEntitySizeLimit` 與 `totalEntitySizeLimit` 統一設為 **500,000**，套用於來源抽取、已完成來源抽取及譯文回寫。
+- 這是 XML 實體大小限制，不是翻譯條目筆數或檔案大小；保留有限上限並禁止 DTD／外部實體讀取。
+- 修正製版流程及啟動腳本，更新版本為 **0.1.3**。升級既有安裝時只需替換 JAR，請保留原本的 `Config.properties` 與提示詞檔案。
+
 ### 使用說明：
 
 #### 1. 從 Crowdin 匯出 XLIFF 文件：
