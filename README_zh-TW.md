@@ -10,6 +10,20 @@ Czech (cs)                  | [README_cs](https://github.com/Angus-repo/xliff-tr
 
 此工具是一個支援xliff(1.2)格式，透過外部 AI 服務（如 ChatGPT）來進行 XLIFF翻譯。
 
+### 0.1.6 修正
+
+- 修正同一次開啟程式、連續處理不同 XLIFF 時，步驟一抽取筆數累計前次結果的問題；每次重新抽取獨立計數，抽取失敗不沿用舊數字。
+- 在原本的 `Config.properties` 加入 `reasoning_effort=medium`，即可明確設定推理強度。不必更換金鑰；舊設定檔未填或留白時也使用 `medium`。
+- 可選值為 `none`、`minimal`、`low`、`medium`、`high`、`xhigh`、`max`；實際支援依模型而異。`gpt-6-luna` 支援除 `minimal` 以外的上述值。`none` 會明確送出停用推理的要求；`default` 則不送此參數，使用模型預設。
+- GPT-4（含 GPT-4o／GPT-4.1）與 GPT-3.5 等非推理模型自動省略此參數。步驟二顯示本次模型與實際套用的推理強度；修改設定後再次執行步驟二即會重新讀取。
+- 較高推理強度可能增加耗時與 reasoning token 用量；支援範圍參考 [OpenAI 推理模型文件](https://developers.openai.com/api/docs/guides/reasoning)及 [GPT-6 Luna](https://developers.openai.com/api/docs/models/gpt-6-luna)。
+
+```properties
+model_version=gpt-6-luna
+reasoning_effort=medium
+batch_size=50
+```
+
 ### 0.1.5 修正
 
 - HTTP 520／其他 5xx、408、409、暫時性 429 及網路中斷會最多重試 3 次，預設等待 2／4／8 秒，並遵守 `Retry-After`。若伺服器要求等待超過 120 秒，停止本輪並保留進度，不提前重試。

@@ -12,6 +12,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Properties;
+import java.util.Locale;
+import java.util.Arrays;
 import java.util.ResourceBundle;
 
 /** Loads user settings from the filesystem, never from the bundled sample key. */
@@ -20,12 +22,14 @@ final class TranslationConfig {
     private final String apiKey;
     private final String model;
     private final int batchSize;
+    private final String reasoningEffort;
 
-    private TranslationConfig(Path path, String apiKey, String model, int batchSize) {
+    private TranslationConfig(Path path, String apiKey, String model, int batchSize, String reasoningEffort) {
         this.path = path;
         this.apiKey = apiKey;
         this.model = model;
         this.batchSize = batchSize;
+        this.reasoningEffort = reasoningEffort;
     }
 
     static TranslationConfig load() throws IOException {
@@ -71,7 +75,12 @@ final class TranslationConfig {
         } catch (NumberFormatException e) {
             throw new IOException(message("error_config_batch") + selected);
         }
-        return new TranslationConfig(selected, apiKey, model, batchSize);
+        String effort = properties.getProperty("reasoning_effort", "medium").trim().toLowerCase(Locale.ROOT);
+        if (effort.isEmpty()) effort = "medium";
+        if (!Arrays.asList("default", "none", "minimal", "low", "medium", "high", "xhigh", "max").contains(effort)) {
+            throw new IOException(message("error_config_reasoning") + selected);
+        }
+        return new TranslationConfig(selected, apiKey, model, batchSize, effort);
     }
 
     private static boolean hasWhitespaceOrQuotes(String key) {
@@ -107,4 +116,14 @@ final class TranslationConfig {
     String getApiKey() { return apiKey; }
     String getModel() { return model; }
     int getBatchSize() { return batchSize; }
+    String getReasoningEffort() { return reasoningEffort; }
+
+    String getRequestReasoningEffort() {
+        String modelId = model.toLowerCase(Locale.ROOT);
+        // These non-reasoning families reject reasoning_effort. Other models can
+        // opt out with "default"; supported effort levels remain model-specific.
+        if ("default".equals(reasoningEffort) || modelId.startsWith("gpt-4")
+                || modelId.startsWith("chatgpt-4o") || modelId.startsWith("gpt-3.5")) return null;
+        return reasoningEffort;
+    }
 }

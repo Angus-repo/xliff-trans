@@ -40,6 +40,14 @@ public class ChatGPTClient {
     }
 
     public static int getCompletedCount() { return progress == null ? 0 : progress.completedCount(); }
+    public static String getReasoningDescription() {
+        if (config == null) return "";
+        ResourceBundle messages = ResourceBundle.getBundle("MessagesBundle");
+        String effort = config.getRequestReasoningEffort();
+        return config.getModel() + " / " + (effort != null ? effort
+                : messages.getString("reasoning_not_sent"));
+    }
+
     public static String getConfigurationPath() { return config == null ? "" : config.getPath().toString(); }
 
     public static int processNextBatch(String filePath) throws Exception {
@@ -55,11 +63,7 @@ public class ChatGPTClient {
         // Freeze this batch's request across retries. Disk writes happen only after success.
         LinkedHashMap<String, String> batch = progress.nextBatch(config.getBatchSize());
         String combinedContent = config.readPrefix() + String.join("\n", batch.values());
-        ObjectMapper mapper = new ObjectMapper();
-        ObjectNode body = mapper.createObjectNode();
-        body.put("model", config.getModel());
-        body.putArray("messages").addObject().put("role", "user").put("content", combinedContent);
-        String requestBody = mapper.writeValueAsString(body);
+        String requestBody = createRequestBody(config, combinedContent);
         RequestConfig timeouts = RequestConfig.custom().setConnectTimeout(Timeout.ofSeconds(30))
                 .setResponseTimeout(Timeout.ofSeconds(180)).build();
         try (CloseableHttpClient client = HttpClients.custom().disableAutomaticRetries()
@@ -67,6 +71,16 @@ public class ChatGPTClient {
             return processBatch(progress, batch, () -> request(client, requestBody, config.getApiKey()),
                     Thread::sleep, notice);
         }
+    }
+
+    static String createRequestBody(TranslationConfig settings, String content) throws IOException {
+        ObjectMapper mapper = new ObjectMapper();
+        ObjectNode body = mapper.createObjectNode();
+        body.put("model", settings.getModel());
+        String effort = settings.getRequestReasoningEffort();
+        if (effort != null) body.put("reasoning_effort", effort);
+        body.putArray("messages").addObject().put("role", "user").put("content", content);
+        return mapper.writeValueAsString(body);
     }
 
     static int processBatch(TranslationProgress progress, LinkedHashMap<String, String> batch,
