@@ -5,12 +5,8 @@ package com.angus.xliff.convert;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.ParserConfigurationException;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.w3c.dom.*;
 import org.xml.sax.SAXException;
-
-import com.angus.xliff.swing.XliffSwingUI;
 
 import java.io.File;
 import java.io.FileWriter;
@@ -24,6 +20,8 @@ public class XmlSourceExtractor {
     private static int extractedCount = 0;
 
     public static void main(String[] args) throws IOException, ParserConfigurationException, SAXException {
+        extractedCount = 0;
+        int currentCount = 0;
         List<String> translateNoList = new ArrayList<>();
 
         try (FileWriter writer = new FileWriter(args[0] + SOURCE_FILE_NAME_POSTFIX)) {
@@ -62,7 +60,7 @@ public class XmlSourceExtractor {
                                 } else {
                                     sourceTag.append(">").append(replaceNewline(sourceText)).append("</source>\n");
                                     writer.write(sourceTag.toString());
-                                    extractedCount++;
+                                    currentCount++;
                                 }
                             }
                         }
@@ -75,6 +73,8 @@ public class XmlSourceExtractor {
             }
 
         }
+        // Publish only this successful extraction, after the output writer closes.
+        extractedCount = currentCount;
     }
 
     public static int getExtractedCount() {

@@ -184,7 +184,6 @@ public class XliffSwingUI extends JFrame {
                     try {
                         XmlSourceExtractor.main(new String[]{filePath});
                         publish(getMessage("step_1_complete") + filePath);
-                        // 假設 XmlSourceExtractor2 返回抽出的筆數
                         int extractedCount = XmlSourceExtractor.getExtractedCount();
                         publish(getMessage("step_1_extracted_count") + extractedCount);
                     } catch (Exception ex) {
@@ -219,6 +218,7 @@ public class XliffSwingUI extends JFrame {
                     try {
                         totalLines = ChatGPTClient.getTotalLines(filePath);
                         publish(getMessage("config_loaded") + ChatGPTClient.getConfigurationPath());
+                        publish(getMessage("reasoning_loaded") + ChatGPTClient.getReasoningDescription());
                         publish(getMessage("step_2_sending_request"));
                     } catch (Exception ex) {
                         publish(getMessage("error_occurred") + ex.getMessage());
